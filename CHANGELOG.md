@@ -1,5 +1,17 @@
 # Cert Warden Client Changelog
 
+## [v0.5.0] - 2025-04-30
+
+Add multiple certificate support. Review the config file for updated
+environment config names:
+https://github.com/gregtwallace/certwarden-client/blob/main/pkg/main/config.go
+Backwards compatibility was maintained for existing installs.
+
+The ability to specify the name of key.pem and certchain.pem was added.
+
+Go and all dependencies updated.
+
+
 ## [v0.4.0] - 2025-01-22
 
 Update Go & Alpine to the latest version, updated the Docker client pkg, 
