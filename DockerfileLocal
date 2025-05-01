@@ -3,6 +3,13 @@
 # example build:
 # docker build . -f DockerfileLocal -t certwarden-client:v0.1.0
 
+# example local and export
+#   docker builder prune -a 
+#   docker build . -f DockerfileLocal -t certwarden-client:v0.5.0-a3
+#   docker save -o ./out/cwc0.5.0-a3.tar certwarden-client:v0.5.0-a3
+# import into docker
+#   docker load -i ./out/cwc0.5.0-a3.tar
+
 # Versions - keep in sync with build_releases.yml
 ARG ALPINE_VERSION=3.21
 ARG GO_VERSION=1.23.5
