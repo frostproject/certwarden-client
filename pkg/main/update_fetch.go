@@ -9,22 +9,22 @@ const (
 )
 
 // updateClientKeyAndCertchain queries the server and retrieves the specified key
-// and certificate PEM from the server. it then updates the app with the new pem
-func (app *app) updateClientKeyAndCertchain() error {
+// and certificate PEM from the server. it then updates the app with the new pem;
+func (app *app) updateClientKeyAndCertchain(certIndex int) error {
 	// get key
-	keyPem, err := app.getPemWithApiKey(app.cfg.ServerAddress+serverEndpointDownloadKeys+"/"+app.cfg.KeyName, app.cfg.KeyApiKey)
+	keyPem, err := app.getPemWithApiKey(app.cfg.ServerAddress+serverEndpointDownloadKeys+"/"+app.cfg.Certs[certIndex].KeyName, app.cfg.Certs[certIndex].KeyApiKey)
 	if err != nil {
-		return fmt.Errorf("failed to get key pem from server (%s)", err)
+		return fmt.Errorf("failed to get key pem %d from server (%s)", certIndex, err)
 	}
 
 	// get cert
-	certPem, err := app.getPemWithApiKey(app.cfg.ServerAddress+serverEndpointDownloadCerts+"/"+app.cfg.CertName, app.cfg.CertApiKey)
+	certPem, err := app.getPemWithApiKey(app.cfg.ServerAddress+serverEndpointDownloadCerts+"/"+app.cfg.Certs[certIndex].CertName, app.cfg.Certs[certIndex].CertApiKey)
 	if err != nil {
-		return fmt.Errorf("failed to get cert pem from server (%s)", err)
+		return fmt.Errorf("failed to get cert pem %d from server (%s)", certIndex, err)
 	}
 
 	// do update of local tls cert
-	err = app.updateClientCert(keyPem, certPem)
+	err = app.updateClientCert(keyPem, certPem, certIndex)
 	if err != nil {
 		return err
 	}

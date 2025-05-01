@@ -19,7 +19,7 @@ type SafeCert struct {
 	sync.RWMutex
 }
 
-// newSafeCert makes a SafeCert using the supplied tlsCert
+// newSafeCert makes a SafeCert
 func NewSafeCert() *SafeCert {
 	return &SafeCert{}
 }

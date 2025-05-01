@@ -18,33 +18,35 @@ func main() {
 	}
 
 	// try and get newer key/cert from server on start
-	currentCertInMemory := false
-	err = app.updateClientKeyAndCertchain()
-	if err != nil {
-		app.logger.Errorf("failed to fetch key/cert from server (%s)", err)
-	} else {
-		currentCertInMemory = true
-	}
-
-	// Fatal if never got a valid TLS certificate (either local or from fetch)
-	if !app.tlsCert.HasValidTLSCertificate() {
-		app.logger.Fatal("no certificate was available locally or via remote fetch, exiting")
-		// os.Exit(1)
-	}
-
-	// run / schedule jobs based on if newest cert is confirmed in memory
-	if currentCertInMemory {
-		// initial fetch worked, try to write disk
-		diskNeedsUpdate := app.updateCertFilesAndRestartContainers(true)
-
-		// schedule write, if needed
-		if diskNeedsUpdate {
-			// fetch was fine but files not written yet, schedule file write
-			app.scheduleJobWriteCertsMemoryToDisk()
+	for certIndex := range app.cfg.Certs {
+		currentCertInMemory := false
+		err = app.updateClientKeyAndCertchain(certIndex)
+		if err != nil {
+			app.logger.Errorf("failed to fetch key/cert %d from server (%s)", certIndex, err)
+		} else {
+			currentCertInMemory = true
 		}
-	} else {
-		// failed to get newest cert, so schedule future fetch and write
-		app.scheduleJobFetchCertsAndWriteToDisk()
+
+		// Fatal if never got a valid TLS certificate (either local or from fetch) -- specifically for the CW client, which uses index 0
+		if certIndex == 0 && !app.tlsCerts[0].HasValidTLSCertificate() {
+			app.logger.Fatal("no certificate for cert 0 was available locally or via remote fetch, exiting")
+			// os.Exit(1)
+		}
+
+		// run / schedule job based on if newest cert is confirmed in memory -- specifically for the client's use
+		if currentCertInMemory {
+			// initial fetch worked, try to write disk
+			diskNeedsUpdate := app.updateCertFilesAndRestartContainers(certIndex, true)
+
+			// schedule write, if needed
+			if diskNeedsUpdate {
+				// fetch was fine but files not written yet, schedule file write
+				app.scheduleJobWriteCertsMemoryToDisk(certIndex)
+			}
+		} else {
+			// failed to get newest cert, so schedule future fetch and write
+			app.scheduleJobFetchCertsAndWriteToDisk(certIndex)
+		}
 	}
 
 	// start https server
@@ -58,9 +60,11 @@ func main() {
 	// wait for shutdown context to signal
 	<-app.shutdownContext.Done()
 
-	// cancel any pending job
-	if app.pendingJobCancel != nil {
-		app.pendingJobCancel()
+	// cancel any pending jobs
+	for certIndex := range app.pendingJobCancels {
+		if app.pendingJobCancels[certIndex] != nil {
+			app.pendingJobCancels[certIndex]()
+		}
 	}
 
 	// wait for each component/service to shutdown
@@ -82,5 +86,5 @@ func main() {
 		app.logger.Panic("graceful shutdown of component(s) failed due to time out, forcing shutdown")
 	}
 
-	app.logger.Info("cert-warden-client exited")
+	app.logger.Info("cert warden client exited")
 }

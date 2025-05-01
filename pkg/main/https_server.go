@@ -25,7 +25,7 @@ func (app *app) startHttpsServer() error {
 		ReadTimeout:  httpServerReadTimeout,
 		WriteTimeout: httpServerWriteTimeout,
 		TLSConfig: &tls.Config{
-			GetCertificate: app.tlsCert.TlsCertFunc(),
+			GetCertificate: app.tlsCerts[0].TlsCertFunc(),
 		},
 	}
 

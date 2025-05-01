@@ -56,19 +56,30 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// decrypt
-	nonceSize := app.cipherAEAD.NonceSize()
-	nonce, ciphertext := bodyDecoded[:nonceSize], bodyDecoded[nonceSize:]
+	// decrypt (find the correct decrypter to determine the index)
+	certIndex := -1
+	bodyDecrypted := []byte{}
+	for i := range app.cipherAEAD {
+		nonceSize := app.cipherAEAD[i].NonceSize()
+		nonce, ciphertext := bodyDecoded[:nonceSize], bodyDecoded[nonceSize:]
 
-	bodyDecrypted, err := app.cipherAEAD.Open(nil, nonce, ciphertext, nil)
-	if err != nil {
+		bodyDecrypted, err = app.cipherAEAD[i].Open(nil, nonce, ciphertext, nil)
+		if err != nil {
+			// no-op, continue
+		} else {
+			certIndex = i
+			break
+		}
+	}
+	// decryption failed
+	if certIndex < 0 {
 		w.WriteHeader(http.StatusUnauthorized)
 		app.logger.Debugf("failed to decrypt inner payload (%s)", err)
 		return
 	}
 
 	// right route & authorized, try to do work
-	app.logger.Infof("authenticated payload received from %s", r.RemoteAddr)
+	app.logger.Infof("authenticated payload received from %s for cert %d", r.RemoteAddr, certIndex)
 
 	// decode payload
 	innerPayload := innerPayload{}
@@ -82,9 +93,9 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// process and install new key/cert in client (will error if bad)
-	err = app.updateClientCert([]byte(innerPayload.KeyPem), []byte(innerPayload.CertPem))
+	err = app.updateClientCert([]byte(innerPayload.KeyPem), []byte(innerPayload.CertPem), certIndex)
 	if err != nil {
-		app.logger.Errorf("failed to process key and/or cert file(s) from server post (%s)", err)
+		app.logger.Errorf("failed to process key and/or cert %d file(s) from server post (%s)", certIndex, err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -94,14 +105,14 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 	// update. If no disk update is needed, ensure cancel any old pending job.
 	go func() {
 		// write files to disk now if file(s) are missing
-		diskNeedsUpdate := app.updateCertFilesAndRestartContainers(true)
+		diskNeedsUpdate := app.updateCertFilesAndRestartContainers(certIndex, true)
 
 		// schedule job if disk still needs an update
 		if diskNeedsUpdate {
-			app.scheduleJobWriteCertsMemoryToDisk()
-		} else if app.pendingJobCancel != nil {
+			app.scheduleJobWriteCertsMemoryToDisk(certIndex)
+		} else if app.pendingJobCancels[certIndex] != nil {
 			// cancel any old pending job if no update needed and there is a job to cancel
-			app.pendingJobCancel()
+			app.pendingJobCancels[certIndex]()
 		}
 	}()
 
