@@ -46,6 +46,12 @@ func (app *app) getPemWithApiKey(url, apiKey string) (pemContent []byte, err err
 	// set apiKey
 	req.Header.Set("apiKey", apiKey)
 
+	// Add Cloudflare Zero Trust headers if configured
+	if app.cfg.CFAccessClientID != "" && app.cfg.CFAccessClientSecret != "" {
+		req.Header.Set("CF-Access-Client-Id", app.cfg.CFAccessClientID)
+		req.Header.Set("CF-Access-Client-Secret", app.cfg.CFAccessClientSecret)
+	}
+
 	// do the request
 	resp, err := app.httpClient.Do(req)
 	if err != nil {

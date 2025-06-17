@@ -152,6 +152,10 @@ type config struct {
 	BindPort      int
 	ServerAddress string
 	Certs         []certConfig
+
+	// Cloudflare Zero Trust Service Token (optional)
+	CFAccessClientID     string
+	CFAccessClientSecret string
 }
 
 // configureApp creates the application from environment variables and/or defaults;
@@ -203,6 +207,13 @@ func configureApp() (*app, error) {
 	if bindPort == "" || err != nil || app.cfg.BindPort < 1 || app.cfg.BindPort > 65535 {
 		app.logger.Debugf("CW_CLIENT_BIND_PORT not specified or invalid, using default \"%d\"", defaultBindPort)
 		app.cfg.BindPort = defaultBindPort
+	}
+
+	// Cloudflare Zero Trust Service Token (Optional)
+	app.cfg.CFAccessClientID = os.Getenv("CW_CLIENT_CF_ACCESS_CLIENT_ID")
+	app.cfg.CFAccessClientSecret = os.Getenv("CW_CLIENT_CF_ACCESS_CLIENT_SECRET")
+	if (app.cfg.CFAccessClientID != "" && app.cfg.CFAccessClientSecret == "") || (app.cfg.CFAccessClientID == "" && app.cfg.CFAccessClientSecret != "") {
+		return app, errors.New("Both CW_CLIENT_CF_ACCESS_CLIENT_ID and CW_CLIENT_CF_ACCESS_CLIENT_SECRET must be set together for Cloudflare Zero Trust authentication")
 	}
 
 	// Configure each cert
